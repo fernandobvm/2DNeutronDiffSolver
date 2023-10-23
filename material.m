@@ -9,6 +9,7 @@ classdef material
         sigma_f
         sigma_t
         geometry
+        num_materials;
     end
 
     methods
@@ -19,6 +20,17 @@ classdef material
             obj.height = height;
             obj.source = source;
             obj.sigma_t = sigma_t;
+            obj.num_materials = 1;
+        end
+
+
+        function obj = addMaterial(obj, source, sigma_t)
+            %addMaterial Add a different material on the side with same
+            %length and height of first material
+            obj.length = (obj.num_materials + 1)*obj.length/obj.num_materials;
+            obj.num_materials = obj.num_materials + 1;
+            obj.source = [obj.source source];
+            obj.sigma_t = [obj.sigma_t sigma_t];
         end
 
 
