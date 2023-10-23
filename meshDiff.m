@@ -70,6 +70,117 @@ classdef meshDiff
                 end
             end
         end
+        function obj = setReflectiveBoundary(obj, edge)
+            if edge == "left"
+                index = 1:obj.n_x:obj.n_x*obj.n_y
+                for i = 2:length(index)-1
+                    k = index(i);
+                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                    obj.A(k,k+1) = -D/obj.dx^2;
+                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                    %add source
+                    obj.Q(k) = 0;
+                end
+                %bottom node
+                k = index(1);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k+1) = -D/obj.dx^2;
+                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+
+                %top node
+                k = index(end);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k+1) = -D/obj.dx^2;
+                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+
+            elseif edge == "bottom"
+                index = 1:1:obj.n_x
+                for i = 2:length(index)-1
+                    k = index(i);
+                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                    obj.A(k,k+1) = -D/obj.dx^2;
+                    obj.A(k,k-1) = -D/obj.dx^2;
+                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                    %add source
+                    obj.Q(k) = 0;
+                end
+                %left node
+                k = index(1);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k+1) = -D/obj.dx^2;
+                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+
+                %right node
+                k = index(end);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k-1) = -D/obj.dx^2;
+                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+            elseif edge == "top"
+                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y
+                for i = 2:length(index)-1
+                    k = index(i);
+                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                    obj.A(k,k+1) = -D/obj.dx^2;
+                    obj.A(k,k-1) = -D/obj.dx^2;
+                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                    %add source
+                    obj.Q(k) = 0;
+                end
+                %left node
+                k = index(1);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k+1) = -D/obj.dx^2;
+                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+
+                %right node
+                k = index(end);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k-1) = -D/obj.dx^2;
+                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+            else
+                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y
+                for i = 2:length(index)-1
+                    k = index(i);
+                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                    obj.A(k,k-1) = -D/obj.dx^2;
+                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                    %add source
+                    obj.Q(k) = 0;
+                end
+                %bottom node
+                k = index(1);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k-1) = -D/obj.dx^2;
+                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+
+                %top node
+                k = index(end);
+                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
+                obj.A(k,k-1) = -D/obj.dx^2;
+                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                %add source
+                obj.Q(k) = 0;
+            end
+
+            for k = 1: length(index)
+                
+        end
 
 
 
