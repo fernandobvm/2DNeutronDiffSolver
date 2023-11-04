@@ -6,10 +6,12 @@ classdef meshDiff
         material
         n_x
         n_y
+        edges_x
+        edges_y
         dx
         dy
-        length
-        height
+        x
+        y
         A
         Q
     end
@@ -19,8 +21,10 @@ classdef meshDiff
             %UNTITLED5 Construct an instance of this class
             %   Detailed explanation goes here
             obj.material = material;
-            obj.n_x = n_x; %nodes number
-            obj.n_y = n_y; %nodes number
+            obj.n_x = n_x; %number of cells in x dimension
+            obj.n_y = n_y; %number of cells in y dimension
+            obj.edges_x = obj.n_x+1;
+            obj.edges_y = obj.n_y+1;
         end
         
         function obj = generateMeshSBS(obj)
@@ -42,154 +46,600 @@ classdef meshDiff
         end
 
         function obj = mesh_uniform_sizing(obj)
+            %considering 1 material only
+            %calculating mesh size in both directions
             obj.dx = obj.material.length/(obj.n_x);
             obj.dy = obj.material.height/(obj.n_y);
-            obj.length = linspace(0, obj.material.length, obj.n_x);
-            obj.height = linspace(0, obj.material.height, obj.n_y);
+            % %calculating center cells coordinates
+            % obj.x = 0+obj.dx/2:obj.dx:obj.material.length-obj.dx/2;
+            % obj.y = 0+obj.dy/2:obj.dy:obj.material.length-obj.dy/2;
 
-            sigma_a = obj.material.sigma_t(1)*ones(1,obj.n_x);
-            sigma_a(obj.length> obj.length/obj.material.num_materials) = obj.material.sigma_t(2);
-            sigma_a(obj.length == obj.length/obj.material.num_materials) = (obj.material.sigma_t(1) + obj.material.sigma_t(2))/2;
-            obj.A = zeros((obj.n_x)*(obj.n_y), (obj.n_x)*(obj.n_y));
-            obj.Q = zeros(1, (obj.n_x)*(obj.n_y));
+            %calculating edge cells coordinates - flux is edge-centered,
+            %properties are cell-centered
+            obj.x = 0:obj.dx:obj.material.length;
+            obj.y = 0:obj.dy:obj.material.height;
 
-            if length(obj.material.source) < 1
-                obj.material.source = obj.material.source*ones(obj.n_x+1, obj.n_y+1);
-            end
-            D = 1;
-            for i = 2: obj.n_x-1
-                for j = 2:obj.n_y-1
-                    k = (j-1)*obj.n_x + i;
+            %calculating D and Sigma_a as constant matrix according cells
+            %coordinates
+            obj.material.D = obj.material.D*ones(obj.edges_y, obj.edges_x);
+            obj.material.sigma_a = obj.material.sigma_a*ones(obj.edges_y, obj.edges_x);
 
-                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                    obj.A(k,k-1) = -D/obj.dx^2;
-                    obj.A(k,k+1) = -D/obj.dx^2;
-                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
-                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
-                    obj.Q(k) = 0; %obj.material.source(i,j);
+            %calculating Source matrix as constant
+            obj.material.source = obj.material.source*ones(obj.edges_y, obj.edges_x);
+            
+            %initialize coef matrix A and source vector Q
+            obj.A = zeros(obj.edges_x*obj.edges_y, obj.edges_x*obj.edges_y);
+            obj.Q = zeros(obj.edges_x*obj.edges_y,1);
+
+            %setting coefficients matrix A for cell that are not boundaries
+            for i = 2: obj.edges_x-1
+                for j = 2:obj.edges_y-1
+                    %giving a unique index for each cell, begins in left
+                    %bottom and goes to the right and the to top
+                    k = (j-1)*obj.edges_x + i;
+
+
+                    %applying FVM formulation described in lesson 14
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i+1,j)/4 + obj.material.source(i,j+1)/4 + obj.material.source(i+1,j+1)/4;
                 end
             end
         end
         function obj = setReflectiveBoundary(obj, edge)
             if edge == "left"
-                index = 1:obj.n_x:obj.n_x*obj.n_y
-                for i = 2:length(index)-1
-                    k = index(i);
-                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                    obj.A(k,k+1) = -D/obj.dx^2;
-                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
-                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                index = 1:obj.n_x:obj.n_x*obj.n_y;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k); 
+
+                    %ai-1,j
+                    a_left = 0;
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k+obj.n_x) = a_top;
                     %add source
-                    obj.Q(k) = 0;
+                    obj.Q(k) = obj.material.source(i+1,j)/4 + obj.material.source(i+1,j+1)/4;
                 end
                 %bottom node
                 k = index(1);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k+1) = -D/obj.dx^2;
-                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
-                %add source
-                obj.Q(k) = 0;
+                [i,j] = obj.k2ij(k); 
+
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k+obj.n_x) = a_top;
+                obj.Q(k) = obj.material.source(i+1,j+1)/4;
 
                 %top node
                 k = index(end);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k+1) = -D/obj.dx^2;
-                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
-                %add source
-                obj.Q(k) = 0;
+                [i,j] = obj.k2ij(k); 
+
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.Q(k) = obj.material.source(i+1,j)/4 ;
 
             elseif edge == "bottom"
-                index = 1:1:obj.n_x
-                for i = 2:length(index)-1
-                    k = index(i);
-                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                    obj.A(k,k+1) = -D/obj.dx^2;
-                    obj.A(k,k-1) = -D/obj.dx^2;
-                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                index = 1:1:obj.n_x;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = 0;
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k+obj.n_x) = a_top;
                     %add source
-                    obj.Q(k) = 0;
+                    obj.Q(k) = obj.material.source(i,j+1)/4 + obj.material.source(i+1,j+1)/4;
                 end
                 %left node
                 k = index(1);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k+1) = -D/obj.dx^2;
-                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k+obj.n_x) = a_top;
                 %add source
-                obj.Q(k) = 0;
+                obj.Q(k) = obj.material.source(i+1,j+1)/4;
 
                 %right node
                 k = index(end);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k-1) = -D/obj.dx^2;
-                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = 0;
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k+obj.n_x) = a_top;
                 %add source
-                obj.Q(k) = 0;
+                obj.Q(k) = obj.material.source(i,j+1)/4;
             elseif edge == "top"
-                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y
-                for i = 2:length(index)-1
-                    k = index(i);
-                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                    obj.A(k,k+1) = -D/obj.dx^2;
-                    obj.A(k,k-1) = -D/obj.dx^2;
-                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = 0;
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k-obj.n_x) = a_bottom;
                     %add source
-                    obj.Q(k) = 0;
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i+1,j)/4;
                 end
                 %left node
                 k = index(1);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k+1) = -D/obj.dx^2;
-                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-obj.n_x) = a_bottom;
                 %add source
-                obj.Q(k) = 0;
+                obj.Q(k) = obj.material.source(i+1,j)/4;
 
                 %right node
                 k = index(end);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k-1) = -D/obj.dx^2;
-                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = 0;
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k-obj.n_x) = a_bottom;
                 %add source
-                obj.Q(k) = 0;
+                obj.Q(k) = obj.material.source(i,j)/4;
             else
-                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y
-                for i = 2:length(index)-1
-                    k = index(i);
-                    obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                    obj.A(k,k-1) = -D/obj.dx^2;
-                    obj.A(k,k-obj.n_x) = -D/obj.dy^2;
-                    obj.A(k,k+obj.n_x) = -D/obj.dy^2;
-                    %add source
-                    obj.Q(k) = 0;
+                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k); 
+
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);;
+                    %ai+1,j
+                    a_right = 0;
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i,j+1)/4;
                 end
                 %bottom node
                 k = index(1);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k-1) = -D/obj.dx^2;
-                obj.A(k,k+obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k); 
+
+                %ai-1,j
+                a_left = -(obj.material.D(j,i)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);;
+                %ai+1,j
+                a_right = 0;
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k+obj.n_x) = a_top;
                 %add source
-                obj.Q(k) = 0;
+                obj.Q(k) = obj.material.source(i,j+1)/4;
 
                 %top node
                 k = index(end);
-                obj.A(k,k) = 2*D/obj.dx^2 + 2*D/obj.dy^2 + sigma_a(i);
-                obj.A(k,k-1) = -D/obj.dx^2;
-                obj.A(k,k-obj.n_x) = -D/obj.dy^2;
+                [i,j] = obj.k2ij(k); 
+                %ai-1,j
+                a_left = -(obj.material.D(j,i)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);;
+                %ai+1,j
+                a_right = 0;
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k-obj.n_x) = a_bottom;
                 %add source
-                obj.Q(k) = 0;
-            end
+                obj.Q(k) = obj.material.source(i,j)/4;
+            end                
+        end
 
-            for k = 1: length(index)
+        function obj = setVacuumBoundary(obj,edge)
+            if edge == "left"
+                index = 1:obj.n_x:obj.n_x*obj.n_y;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k+obj.n_x) = a_top;
+                    %add source
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i,j+1);
+                end
+                %bottom node
+                k = index(1);
+
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k+obj.n_x) = a_top;
+                %add source
+                obj.Q(k) = obj.material.source(i,j+1)/4;
+
+                %top node
+                k = index(1);
+
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-obj.n_x) = a_bottom;
+                %add source
+                obj.Q(k) = obj.material.source(i,j)/4;
+
+            elseif edge == "bottom"
+                index = 1:1:obj.n_x;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*2.1312*obj.material.D(i,j+1));
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k+obj.n_x) = a_top;
+                    %add source
+                    obj.Q(k) = obj.material.source(i,j+1)/4 + obj.material.source(i+1,j+1)/4;
+                end
+                %left node
+                k = index(1);
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*2.1312*obj.material.D(i,j+1));
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k+obj.n_x) = a_top;
+                %add source
+                obj.Q(k) = obj.material.source(i+1,j+1)/4;
+
+                %right node
+                k = index(end);[i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*2.1312*obj.material.D(i,j+1));
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k+obj.n_x) = a_top;
+                %add source
+                obj.Q(k) = obj.material.source(i,j+1)/4;
+            elseif edge == "top"
+                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y;
+                for a = 2:length(index)-1
+                    k = index(a);
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j)*obj.dx + obj.material.D(i+1,j)*obj.dx)/(2*2.1312*obj.material.D(i,j));
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k+1) = a_right;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    %add source
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i+1,j)/4;
                 
+                end
+                %left node
+                k = index(1);
+
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = 0;
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
+                %ai,j-1
+                a_bottom = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = -(obj.material.D(i+1,j)*obj.dx)/(2*2.1312*obj.material.D(i,j));
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-obj.n_x) = a_bottom;
+                %add source
+                obj.Q(k) = obj.material.source(i+1,j)/4;
+                
+
+                %right node
+                k = index(end);
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = 0;
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = -(obj.material.D(i,j)*obj.dx )/(2*2.1312*obj.material.D(i,j));
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k+1) = a_right;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k-obj.n_x) = a_bottom;
+                %add source
+                obj.Q(k) = obj.material.source(i,j)/4;
+            else
+                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y
+                for a = 2:length(index)-1
+                    k = index(a);
+                    
+                    [i,j] = obj.k2ij(k);
+                    %ai-1,j
+                    a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                    %ai+1,j
+                    a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                    %ai,j-1
+                    a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                    %ai,j+1
+                    a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                    %ai,j
+                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                    obj.A(k,k) = a_center;
+                    obj.A(k,k-1) = a_left;
+                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k+obj.n_x) = a_top;
+                    %add source
+                    obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i,j+1);
+                end
+                %bottom node
+                k = index(1);
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                %ai,j-1
+                a_bottom = 0;
+                %ai,j+1
+                a_top = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k+obj.n_x) = a_top;
+                %add source
+                obj.Q(k) = obj.material.source(i,j+1)/4;
+
+                %top node
+                k = index(end);
+                [i,j] = obj.k2ij(k);
+                %ai-1,j
+                a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
+                %ai+1,j
+                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                %ai,j-1
+                a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
+                %ai,j+1
+                a_top = 0;
+                %ai,j
+                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+
+                obj.A(k,k) = a_center;
+                obj.A(k,k-1) = a_left;
+                obj.A(k,k-obj.n_x) = a_bottom;
+                %add source
+                obj.Q(k) = obj.material.source(i,j)/4;
+            end
         end
 
 
-
-        function obj = plotMesh(obj)
-            for j = obj.n_x + 1 :-1: 1
-                for i = 1 : obj.n_y+1
-                    fprintf("(%d,%d) = %d ", j,i, (j-1)*(obj.n_x+1) + i);
+        function  plotMesh(obj)
+            for j = obj.edges_y :-1: 1
+                for i = 1 : obj.edges_x
+                    fprintf("(%d,%d) = %d ", i,j, (j-1)*(obj.edges_x) + i);
                 end
                 fprintf("\n")
+            end
+        end
+
+        function [i,j] = k2ij(obj,k)
+            j = mod(k,obj.edges_x);
+            i = floor(k/obj.edges_x)+1;
+            if j == 0
+                j=obj.edges_x;
+                i = i - 1;
             end
         end
     end

@@ -6,20 +6,23 @@ classdef material
         length
         height
         source
-        sigma_f
         sigma_t
         geometry
         num_materials;
+        D
+        sigma_a
     end
 
     methods
-        function obj = material(length, height, source, sigma_t)
+        function obj = material(length, height, source, sigma_t, D)
             %UNTITLED4 Construct an instance of this class
             %   Detailed explanation goes here
             obj.length = length;
             obj.height = height;
             obj.source = source;
             obj.sigma_t = sigma_t;
+            obj.sigma_a = sigma_t;
+            obj.D = D;
             obj.num_materials = 1;
         end
 
