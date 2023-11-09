@@ -3,14 +3,29 @@ classdef DiffSolver2D
     %   Detailed explanation goes here
 
     properties
-        Property1
+        mesh
+        phi
     end
 
     methods
-        function obj = DiffSolver2D(inputArg1,inputArg2)
+        function obj = DiffSolver2D(mesh)
             %UNTITLED2 Construct an instance of this class
             %   Detailed explanation goes here
-            obj.Property1 = inputArg1 + inputArg2;
+            obj.mesh = mesh;
+        end
+
+        function obj = solve(obj, method, max_iter, tol, omega)
+            if nargin == 5 && method == "SOR"
+                    obj.phi = SOR(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), omega, max_iter, tol);
+            else
+                max_iter = 1e5;
+                tol = 1e-6;
+                    if method == "GS"
+                        obj.phi = gaussSeidel(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+                    else
+                        obj.phi = jacobi(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+                    end
+            end
         end
 
         function outputArg = method1(obj,inputArg)
