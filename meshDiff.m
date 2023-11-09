@@ -72,8 +72,8 @@ classdef meshDiff
             obj.Q = zeros(obj.edges_x*obj.edges_y,1);
 
             %setting coefficients matrix A for cell that are not boundaries
-            for i = 2: obj.edges_x-1
-                for j = 2:obj.edges_y-1
+            for j = 2: obj.edges_x-1
+                for i = 2:obj.edges_y-1
                     %giving a unique index for each cell, begins in left
                     %bottom and goes to the right and the to top
                     k = (j-1)*obj.edges_x + i;
@@ -95,15 +95,15 @@ classdef meshDiff
                     obj.A(k,k) = a_center;
                     obj.A(k,k-1) = a_left;
                     obj.A(k,k+1) = a_right;
-                    obj.A(k,k-obj.n_x) = a_bottom;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i+1,j)/4 + obj.material.source(i,j+1)/4 + obj.material.source(i+1,j+1)/4;
                 end
             end
         end
         function obj = setReflectiveBoundary(obj, edge)
             if edge == "left"
-                index = 1:obj.n_x:obj.n_x*obj.n_y;
+                index = 1:obj.edges_x:obj.edges_x*obj.edges_y;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k); 
@@ -167,7 +167,7 @@ classdef meshDiff
                 obj.Q(k) = obj.material.source(i+1,j)/4 ;
 
             elseif edge == "bottom"
-                index = 1:1:obj.n_x;
+                index = 1:1:obj.edges_x;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k);
@@ -228,7 +228,7 @@ classdef meshDiff
                 %add source
                 obj.Q(k) = obj.material.source(i,j+1)/4;
             elseif edge == "top"
-                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y;
+                index = obj.edges_x*(obj.edges_y - 1) + 1:1:obj.edges_x*obj.edges_y;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k);
@@ -292,7 +292,7 @@ classdef meshDiff
                 %add source
                 obj.Q(k) = obj.material.source(i,j)/4;
             else
-                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y;
+                index =  obj.edges_x:obj.edges_x:obj.edges_x*obj.edges_y;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k); 
@@ -361,10 +361,9 @@ classdef meshDiff
 
         function obj = setVacuumBoundary(obj,edge)
             if edge == "left"
-                index = 1:obj.n_x:obj.n_x*obj.n_y;
+                index = 1:obj.edges_x:obj.edges_x*obj.edges_y;
                 for a = 2:length(index)-1
                     k = index(a);
-                    
                     [i,j] = obj.k2ij(k);
                     %ai-1,j
                     a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
@@ -379,8 +378,8 @@ classdef meshDiff
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
-                    obj.A(k,k-obj.n_x) = a_bottom;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     %add source
                     obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i,j+1);
                 end
@@ -401,18 +400,18 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i,j+1)/4;
 
                 %top node
-                k = index(1);
+                k = index(end);
 
                 [i,j] = obj.k2ij(k);
                 %ai-1,j
-                a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i,j+1)*obj.dy)/(2*2.1312*obj.material.D(i,j));
+                a_left = -(obj.material.D(i,j)*obj.dy)/(2*2.1312*obj.material.D(i,j));
                 %ai+1,j
-                a_right = -(obj.material.D(i+1,j)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
+                a_right = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
                 %ai,j-1
                 a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
                 %ai,j+1
@@ -422,12 +421,12 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j)/4;
 
             elseif edge == "bottom"
-                index = 1:1:obj.n_x;
+                index = 1:1:obj.edges_x;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k);
@@ -445,7 +444,7 @@ classdef meshDiff
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     %add source
                     obj.Q(k) = obj.material.source(i,j+1)/4 + obj.material.source(i+1,j+1)/4;
                 end
@@ -466,12 +465,13 @@ classdef meshDiff
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i+1,j+1)/4;
 
                 %right node
-                k = index(end);[i,j] = obj.k2ij(k);
+                k = index(end);
+                [i,j] = obj.k2ij(k);
                 %ai-1,j
                 a_left = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
                 %ai+1,j
@@ -486,11 +486,11 @@ classdef meshDiff
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i,j+1)/4;
             elseif edge == "top"
-                index = obj.n_x*(obj.n_y - 1) + 1:1:obj.n_x*obj.n_y;
+                index = obj.edges_x*(obj.edges_y - 1) + 1:1:obj.edges_x*obj.edges_y;
                 for a = 2:length(index)-1
                     k = index(a);
                     [i,j] = obj.k2ij(k);
@@ -509,7 +509,7 @@ classdef meshDiff
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
                     %add source
                     obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i+1,j)/4;
                 
@@ -532,7 +532,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i+1,j)/4;
                 
@@ -555,11 +555,11 @@ classdef meshDiff
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j)/4;
             else
-                index =  obj.n_x:obj.n_x:obj.n_x*obj.n_y
+                index =  obj.edges_x:obj.edges_x:obj.edges_x*obj.edges_y
                 for a = 2:length(index)-1
                     k = index(a);
                     
@@ -577,8 +577,8 @@ classdef meshDiff
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k-obj.n_x) = a_bottom;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     %add source
                     obj.Q(k) = obj.material.source(i,j)/4 + obj.material.source(i,j+1);
                 end
@@ -598,7 +598,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i,j+1)/4;
 
@@ -618,7 +618,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j)/4;
             end
