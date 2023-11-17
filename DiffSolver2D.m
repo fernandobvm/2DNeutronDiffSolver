@@ -15,17 +15,29 @@ classdef DiffSolver2D
         end
 
         function obj = solve(obj, method, max_iter, tol, omega)
-            if nargin == 5 && method == "SOR"
-                    obj.phi = SOR(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), omega, max_iter, tol);
-            else
+            if nargin == 1
                 max_iter = 1e5;
                 tol = 1e-6;
-                    if method == "GS"
-                        obj.phi = gaussSeidel(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
-                    else
-                        obj.phi = jacobi(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
-                    end
+                method = "Jacobi";
+            elseif nargin == 2
+                max_iter = 1e5;
+                tol = 1e-6;
+                omega = 1.3;
+            elseif nargin == 3
+                tol = 1e-6;
+                omega = 1.3;
+            elseif nargin == 4
+                omega = 1.3;
             end
+            
+            if method == "Jacobi"
+                obj.phi = jacobi(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+            elseif method == "GS"
+                obj.phi = gaussSeidel(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+            else
+                obj.phi = SOR(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), omega, max_iter, tol);
+            end
+            
         end
 
         function outputArg = method1(obj,inputArg)
