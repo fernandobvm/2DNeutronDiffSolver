@@ -31,13 +31,13 @@ classdef DiffSolver2D
             end
             
             if method == "Jacobi"
-                obj.phi = jacobi(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+                obj.phi = jacobi(sparse(obj.mesh.A), obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
             elseif method == "GS"
-                obj.phi = gaussSeidel(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
+                obj.phi = gaussSeidel(sparse(obj.mesh.A), obj.mesh.Q, zeros(length(obj.mesh.Q),1), max_iter, tol);
             elseif method == "Matlab"
-                obj.phi = obj.mesh.A\obj.mesh.Q
+                obj.phi = sparse(obj.mesh.A)\obj.mesh.Q;
             else
-                obj.phi = SOR(obj.mesh.A, obj.mesh.Q, zeros(length(obj.mesh.Q),1), omega, max_iter, tol);
+                obj.phi = SOR(sparse(obj.mesh.A), obj.mesh.Q, zeros(length(obj.mesh.Q),1), omega, max_iter, tol);
             end
             
         end

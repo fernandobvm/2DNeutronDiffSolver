@@ -14,6 +14,7 @@ classdef meshDiff
         y
         A
         Q
+        k
     end
 
     methods
@@ -72,15 +73,16 @@ classdef meshDiff
             
             %initialize coef matrix A and source vector Q
             obj.A = zeros(obj.edges_x*obj.edges_y, obj.edges_x*obj.edges_y);
-            size(obj.A)
             obj.Q = zeros(obj.edges_x*obj.edges_y,1);
+            obj.k = zeros(obj.edges_y, obj.edges_x);
 
             %setting coefficients matrix A for cell that are not boundaries
-            for j = 2: obj.edges_x-1
-                for i = 2:obj.edges_y-1
+            for i = 2: obj.edges_y-1
+                for j = 2:obj.edges_x-1
                     %giving a unique index for each cell, begins in left
                     %bottom and goes to the right and the to top
                     k = (i-1)*obj.edges_x + j;
+                    obj.k(i,j) = k;
 
 
                     %applying FVM formulation described in lesson 14
@@ -125,10 +127,10 @@ classdef meshDiff
                     
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
-                    obj.A(k,k-obj.n_x) = a_bottom;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     %add source
-                    obj.Q(k) = obj.material.source(i,j+1)*obj.dx*obj.dy/4 + obj.material.source(i+1,j+1)*obj.dx*obj.dy/4;
+                    obj.Q(k) = 0;obj.material.source(i,j+1)*obj.dx*obj.dy/4 + obj.material.source(i+1,j+1)*obj.dx*obj.dy/4;
                 end
                 %bottom node
                 k = index(1);
@@ -147,7 +149,7 @@ classdef meshDiff
                     
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 obj.Q(k) = obj.material.source(i+1,j+1)*obj.dx*obj.dy/4;
 
                 %top node
@@ -167,7 +169,7 @@ classdef meshDiff
                     
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 obj.Q(k) = obj.material.source(i,j+1)*obj.dx*obj.dy/4;
 
             elseif edge == "bottom"
@@ -189,7 +191,7 @@ classdef meshDiff
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     %add source
                     obj.Q(k) = obj.material.source(i+1,j)*obj.dx*obj.dy/4 + obj.material.source(i+1,j+1)*obj.dx*obj.dy/4;
                 end
@@ -208,7 +210,7 @@ classdef meshDiff
                 a_center = obj.material.sigma_a(i+1,j+1)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i+1,j+1)*obj.dx*obj.dy/4;
 
@@ -228,7 +230,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i+1,j)*obj.dx*obj.dy/4;
             elseif edge == "top"
@@ -251,7 +253,7 @@ classdef meshDiff
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k-obj.n_x) = a_bottom;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
                     %add source
                     obj.Q(k) = obj.material.source(i,j)*obj.dx*obj.dy/4 + obj.material.source(i,j+1)*obj.dx*obj.dy/4;
                 end
@@ -271,7 +273,7 @@ classdef meshDiff
                     
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j+1)*obj.dx*obj.dy/4;
 
@@ -292,7 +294,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j)*obj.dx*obj.dy/4;
             else
@@ -315,8 +317,8 @@ classdef meshDiff
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k-1) = a_left;
-                    obj.A(k,k-obj.n_x) = a_bottom;
-                    obj.A(k,k+obj.n_x) = a_top;
+                    obj.A(k,k-obj.edges_x) = a_bottom;
+                    obj.A(k,k+obj.edges_x) = a_top;
                     obj.Q(k) = obj.material.source(i,j)*obj.dx*obj.dy/4 + obj.material.source(i+1,j)*obj.dx*obj.dy/4;
                 end
                 %bottom node
@@ -337,7 +339,7 @@ classdef meshDiff
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k+obj.n_x) = a_top;
+                obj.A(k,k+obj.edges_x) = a_top;
                 %add source
                 obj.Q(k) = obj.material.source(i+1,j)*obj.dx*obj.dy/4;
 
@@ -357,7 +359,7 @@ classdef meshDiff
                     
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
-                obj.A(k,k-obj.n_x) = a_bottom;
+                obj.A(k,k-obj.edges_x) = a_bottom;
                 %add source
                 obj.Q(k) = obj.material.source(i,j)*obj.dx*obj.dy/4;
             end                
@@ -370,7 +372,7 @@ classdef meshDiff
                     k = index(a);
                     [i,j] = obj.k2ij(k);
                     %ai-1,j
-                    a_left = -1/(2*2.1312*obj.material.D(i,j));
+                    a_left = -1/(2.1312*obj.material.D(i,j));
                     %ai+1,j
                     a_right = -(obj.material.D(i,j+1)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
                     %ai,j-1
@@ -378,7 +380,7 @@ classdef meshDiff
                     %ai,j+1
                     a_top = -(obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
                     %ai,j
-                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 + obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
@@ -392,7 +394,7 @@ classdef meshDiff
 
                 [i,j] = obj.k2ij(k);
                 %ai-1,j
-                a_left = -1/(2*2.1312*obj.material.D(i,j));
+                a_left = -1/(2.1312*obj.material.D(i,j));
                 %ai+1,j
                 a_right = -(obj.material.D(i,j+1)*obj.dy + obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
                 %ai,j-1
@@ -400,7 +402,7 @@ classdef meshDiff
                 %ai,j+1
                 a_top = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
@@ -413,7 +415,7 @@ classdef meshDiff
 
                 [i,j] = obj.k2ij(k);
                 %ai-1,j
-                a_left = -1/(2*2.1312*obj.material.D(i,j));
+                a_left = -1/(2.1312*obj.material.D(i,j));
                 %ai+1,j
                 a_right = -(obj.material.D(i,j+1)*obj.dy)/(2*obj.dx);
                 %ai,j-1
@@ -421,7 +423,7 @@ classdef meshDiff
                 %ai,j+1
                 a_top = 0;
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
@@ -439,11 +441,11 @@ classdef meshDiff
                     %ai+1,j
                     a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
                     %ai,j-1
-                    a_bottom = -1/(2*2.1312*obj.material.D(i,j));
+                    a_bottom = -1/(2.1312*obj.material.D(i,j));
                     %ai,j+1
                     a_top = -(obj.material.D(i+1,j)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
                     %ai,j
-                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    a_center = obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 + obj.material.sigma_a(i+1,j+1)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k+1) = a_right;
@@ -460,11 +462,11 @@ classdef meshDiff
                 %ai+1,j
                 a_right = -(obj.material.D(i+1,j+1)*obj.dy)/(2*obj.dx);
                 %ai,j-1
-                a_bottom = -1/(2*2.1312*obj.material.D(i,j));
+                a_bottom = -1/(2.1312*obj.material.D(i,j));
                 %ai,j+1
                 a_top = -(obj.material.D(i+1,j)*obj.dx + obj.material.D(i+1,j+1)*obj.dx)/(2*obj.dy);
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i+1,j+1)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
@@ -480,11 +482,11 @@ classdef meshDiff
                 %ai+1,j
                 a_right = 0;
                 %ai,j-1
-                a_bottom = -1/(2*2.1312*obj.material.D(i,j));
+                a_bottom = -1/(2.1312*obj.material.D(i,j));
                 %ai,j+1
                 a_top = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k+1) = a_right;
@@ -503,9 +505,9 @@ classdef meshDiff
                     %ai,j-1
                     a_bottom = -(obj.material.D(i,j)*obj.dx + obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
                     %ai,j+1
-                    a_top = -1/(2*2.1312*obj.material.D(i,j));
+                    a_top = -1/(2.1312*obj.material.D(i,j));
                     %ai,j
-                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 + obj.material.sigma_a(i,j+1)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
                     
 
                     obj.A(k,k) = a_center;
@@ -527,9 +529,9 @@ classdef meshDiff
                 %ai,j-1
                 a_bottom = -(obj.material.D(i,j+1)*obj.dx)/(2*obj.dy);
                 %ai,j+1
-                a_top = -1/(2*2.1312*obj.material.D(i,j));
+                a_top = -1/(2.1312*obj.material.D(i,j));
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i,j+1)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
                     
 
                 obj.A(k,k) = a_center;
@@ -549,9 +551,9 @@ classdef meshDiff
                 %ai,j-1
                 a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
                 %ai,j+1
-                a_top = -1/(2*2.1312*obj.material.D(i,j));
+                a_top = -1/(2.1312*obj.material.D(i,j));
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
                     
 
                 obj.A(k,k) = a_center;
@@ -568,13 +570,13 @@ classdef meshDiff
                     %ai-1,j
                     a_left = -(obj.material.D(i,j)*obj.dy + obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
                     %ai+1,j
-                    a_right = -1/(2*2.1312*obj.material.D(i,j));
+                    a_right = -1/(2.1312*obj.material.D(i,j));
                     %ai,j-1
                     a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
                     %ai,j+1
                     a_top = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
                     %ai,j
-                    a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                    a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 + obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                     obj.A(k,k) = a_center;
                     obj.A(k,k-1) = a_left;
@@ -589,13 +591,13 @@ classdef meshDiff
                 %ai-1,j
                 a_left = -(obj.material.D(i+1,j)*obj.dy)/(2*obj.dx);
                 %ai+1,j
-                a_right = -1/(2*2.1312*obj.material.D(i,j));
+                a_right = -1/(2.1312*obj.material.D(i,j));
                 %ai,j-1
                 a_bottom = 0;
                 %ai,j+1
                 a_top = -(obj.material.D(i+1,j)*obj.dx)/(2*obj.dy);
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i+1,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
@@ -609,13 +611,13 @@ classdef meshDiff
                 %ai-1,j
                 a_left = -(obj.material.D(i,j)*obj.dy)/(2*obj.dx);
                 %ai+1,j
-                a_right = -1/(2*2.1312*obj.material.D(i,j));
+                a_right = -1/(2.1312*obj.material.D(i,j));
                 %ai,j-1
                 a_bottom = -(obj.material.D(i,j)*obj.dx)/(2*obj.dy);
                 %ai,j+1
                 a_top = 0;
                 %ai,j
-                a_center = obj.material.sigma_a(i,j) - (a_left + a_right + a_bottom + a_top);
+                a_center = obj.material.sigma_a(i,j)*obj.dx*obj.dy/4 - (a_left + a_right + a_bottom + a_top);
 
                 obj.A(k,k) = a_center;
                 obj.A(k,k-1) = a_left;
@@ -641,6 +643,15 @@ classdef meshDiff
             if j == 0
                 j=obj.edges_x;
                 i = i - 1;
+            end
+        end
+
+        function k = testMesh(obj)
+            k = zeros(obj.edges_y, obj.edges_x);
+            for j = 1:obj.edges_x
+                for i = 1:obj.edges_y
+                    k(i,j) = (i-1)*obj.edges_x + j;
+                end
             end
         end
     end
