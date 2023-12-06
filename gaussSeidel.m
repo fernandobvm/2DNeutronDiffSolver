@@ -15,7 +15,7 @@ function [x,tol_reached] = gaussSeidel(A, b, x0, max_iter, tol)
                 x(i+1,j) = (1/A(j,j))*(b(j) - ( dot(A(j,1:j),x(i+1,1:j)) + dot(A(j,j:lb),x(i,j:lb)) - A(j,j)*( x(i+1,j) + x(i,j) )));
             end
 
-            if norm(x(i+1)-x(i),inf)./x(i) <tol
+            if norm(x(i+1)-x(i),inf)./norm(x(i),inf) <tol
                 tol_reached = 1;
                 break;
             end

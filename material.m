@@ -1,6 +1,6 @@
 classdef material
-    %UNTITLED4 Summary of this class goes here
-    %   Detailed explanation goes here
+    %material Defines the materials used for diffusion simulation
+    %   All material parameters are defined and calculated in this class.
 
     properties
         length
@@ -16,8 +16,8 @@ classdef material
 
     methods
         function obj = material(length, height, source, sigma_t, c)
-            %UNTITLED4 Construct an instance of this class
-            %   Detailed explanation goes here
+            %Material Construct an instance of material class
+            %   Define input parameters of materials used for simulation.
             obj.length = length;
             obj.height = height;
             obj.source = source;
@@ -30,7 +30,7 @@ classdef material
 
         function obj = addMaterial(obj, material)
             %addMaterial Add a different material on the side with same
-            %length and height of first material
+            %length and height of first material.
             obj.length = 2*obj.length;
             obj.height = obj.height;
             obj.source = [obj.source material.source];
@@ -41,6 +41,8 @@ classdef material
         end
 
         function obj = calculateProperties(obj,edges_x,edges_y)
+            %calculateProperties method that calculates the properties of
+            %materials according to mesh discretization.
             if obj.num_materials == 2
                 D = ones(edges_y, edges_x);
                 sigma_a = ones(edges_y, edges_x);
@@ -77,98 +79,7 @@ classdef material
                 obj.sigma_a = obj.sigma_a*ones(edges_y, edges_x);
                 obj.source = obj.source*ones(edges_y, edges_x);
             
-            end
-            
-        end
-
-
-        function obj = calculateProperties3(obj,edges_x,edges_y)
-            if obj.num_materials == 2
-                D = ones(edges_y, edges_x);
-                sigma_a = ones(edges_y, edges_x);
-                source = ones(edges_y, edges_x);
-
-                if mod(edges_x,2) == 0
-                    D(1:edges_y/2,:) = obj.D(1);
-                    D(edges_y/2+1:end,:) = obj.D(2);
-                    sigma_a(1:edges_y/2,:) = obj.sigma_a(1);
-                    sigma_a(edges_y/2+1:end,:) = obj.sigma_a(2);
-                    source(1:edges_y/2,:) = obj.source(1);
-                    source(edges_y/2+1:end,:) = obj.source(2);
-
-                    obj.D = D;
-                    obj.sigma_a = sigma_a;
-                    obj.source = source;
-                else
-                    D(1:floor(edges_y/2),:) = obj.D(1);
-                    D(ceil(edges_y/2)+1:end,:) = obj.D(2);
-                    D(ceil(edges_y/2),:) = (obj.D(1)+obj.D(2))/2;
-                    sigma_a(1:floor(edges_y/2),:) = obj.sigma_a(1);
-                    sigma_a(ceil(edges_y/2)+1:end,:) = obj.sigma_a(2);
-                    sigma_a(ceil(edges_y/2),:) = (obj.sigma_a(1)+obj.sigma_a(2))/2;
-                    source(1:floor(edges_y/2),:) = obj.source(1);
-                    source(ceil(edges_y/2)+1:end,:) = obj.source(2);
-                    source(ceil(edges_y/2),:) = (obj.source(1)+obj.source(2))/2;
-                    
-                    obj.D = D;
-                    obj.sigma_a = sigma_a;
-                    obj.source = source;
-                end
-            else
-                obj.D = obj.D*ones(edges_y, edges_x);
-                obj.sigma_a = obj.sigma_a*ones(edges_y, edges_x);
-                obj.source = obj.source*ones(edges_y, edges_x);
-            
-            end
-            
-        end
-
-        function obj = calculateProperties2(obj,edges_x,edges_y)
-            if obj.num_materials == 2
-                D = ones(edges_y, edges_x);
-                sigma_a = ones(edges_y, edges_x);
-                source = ones(edges_y, edges_x);
-
-                if mod(edges_x,2) == 0
-                    D(:,1:edges_x/2) = obj.D(1);
-                    D(:,edges_x/2+1:end) = obj.D(2);
-                    sigma_a(:,1:edges_x/2) = obj.sigma_a(1);
-                    sigma_a(:,edges_x/2+1:end) = obj.sigma_a(2);
-                    source(:,1:edges_x/2) = obj.source(1);
-                    source(:,edges_x/2+1:end) = obj.source(2);
-
-                    obj.D = D;
-                    obj.sigma_a = sigma_a;
-                    obj.source = source;
-                else
-                    D(:,1:floor(edges_x/2)) = obj.D(1);
-                    D(:,ceil(edges_x/2)+1:end) = obj.D(2);
-                    D(:,ceil(edges_x/2)) = (obj.D(1)+obj.D(2))/2;
-                    sigma_a(:,1:floor(edges_x/2)) = obj.sigma_a(1);
-                    sigma_a(:,ceil(edges_x/2)+1:end) = obj.sigma_a(2);
-                    sigma_a(:,ceil(edges_x/2)) = (obj.sigma_a(1)+obj.sigma_a(2))/2;
-                    source(:,1:floor(edges_x/2)) = obj.source(1);
-                    source(:,ceil(edges_x/2)+1:end) = obj.source(2);
-                    source(:,ceil(edges_x/2)) = (obj.source(1)+obj.source(2))/2;
-                    
-                    obj.D = D;
-                    obj.sigma_a = sigma_a;
-                    obj.source = source;
-                end
-            else
-                obj.D = obj.D*ones(edges_y, edges_x);
-                obj.sigma_a = obj.sigma_a*ones(edges_y, edges_x);
-                obj.source = obj.source*ones(edges_y, edges_x);
-            
-            end
-            
-        end
-
-
-        function outputArg = method1(obj,inputArg)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
-            outputArg = obj.Property1 + inputArg;
+            end        
         end
     end
 end
